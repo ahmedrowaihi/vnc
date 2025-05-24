@@ -11,8 +11,8 @@ services:
       - VNC_PASSWORD=playwright
       - DISPLAY=:1
     ports:
-      - "5901:5901" # VNC port
-      - "9222:9222" # Chrome debugging port
+      - "5901:5901/tcp" # VNC port
+      - "9222:9222/tcp" # Chrome debugging port
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "5901"]

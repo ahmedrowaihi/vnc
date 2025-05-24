@@ -5,6 +5,7 @@ FROM mcr.microsoft.com/playwright
 ARG RESOLUTION=1920x1080
 ARG VNC_PORT=5901
 ARG DEBUG_PORT=9222
+ARG PROXY_PORT=9223
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -12,6 +13,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     RESOLUTION=${RESOLUTION} \
     VNC_PORT=${VNC_PORT} \
     DEBUG_PORT=${DEBUG_PORT} \
+    PROXY_PORT=${PROXY_PORT} \
     USER=root
 
 # Install dependencies
@@ -25,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     adwaita-icon-theme \
     gnome-themes-standard \
     net-tools \
+    socat \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -60,8 +63,7 @@ start_chromium() {
 
     # Start Chromium with debugging enabled and listening on all interfaces
     \$CHROMIUM_PATH \
-        --remote-debugging-address=0.0.0.0 \
-        --remote-debugging-port=9222 \
+        --remote-debugging-port=\${DEBUG_PORT} \
         --remote-allow-origins=* \
         --remote-allow-ips=* \
         --no-first-run \
@@ -80,14 +82,23 @@ start_chromium() {
     # Wait for Chrome to start
     sleep 2
     
-    # Verify the port is listening on all interfaces
-    netstat -tulpn | grep chrome
+    # Start the proxy for Chrome debugging
+    echo "Starting Chrome debug proxy..."
+    while true; do
+        socat TCP-LISTEN:\${PROXY_PORT},reuseaddr,fork TCP:localhost:\${DEBUG_PORT}
+        sleep 1
+    done &
+    PROXY_PID=\$!
+
+    # Verify the ports are listening
+    netstat -tulpn | grep -E "chrome|socat"
 }
 
 # Function to handle cleanup
 cleanup() {
     echo "Cleaning up..."
     kill \$CHROMIUM_PID 2>/dev/null || true
+    kill \$PROXY_PID 2>/dev/null || true
     killall openbox 2>/dev/null || true
     vncserver -kill :1 || true
 }
@@ -123,6 +134,21 @@ EOF
 
 RUN chmod +x /root/.vnc/xstartup
 
+# Create proxy script for Chrome debugging
+RUN <<EOF cat > /chrome-debug-proxy.sh
+#!/bin/bash
+set -e
+
+# Proxy Chrome debugging port to allow external connections
+while true; do
+    echo "Starting Chrome debug proxy on port ${DEBUG_PORT}..."
+    nc -l -p ${DEBUG_PORT} -c "nc 127.0.0.1 ${DEBUG_PORT}"
+    sleep 1
+done
+EOF
+
+RUN chmod +x /chrome-debug-proxy.sh
+
 # Create startup script
 RUN <<EOF cat > /start.sh
 #!/bin/bash
@@ -143,6 +169,9 @@ echo "Starting VNC server at \$RESOLUTION..."
 vncserver -kill :1 || true
 vncserver -geometry \$RESOLUTION
 
+# Start Chrome debug proxy in background
+/chrome-debug-proxy.sh &
+
 # Keep container running
 tail -f /dev/null
 EOF
@@ -150,7 +179,7 @@ EOF
 RUN chmod +x /start.sh
 
 # Expose VNC and debugging ports
-EXPOSE ${VNC_PORT} ${DEBUG_PORT}
+EXPOSE ${VNC_PORT} ${PROXY_PORT}
 
 # Set entrypoint
 ENTRYPOINT ["/start.sh"]

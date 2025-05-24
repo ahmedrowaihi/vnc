@@ -7,12 +7,13 @@ services:
         RESOLUTION: 1920x1080
         VNC_PORT: 5901
         DEBUG_PORT: 9222
+        PROXY_PORT: 9223
     environment:
       - VNC_PASSWORD=playwright
       - DISPLAY=:1
     ports:
       - "5901:5901/tcp" # VNC port
-      - "9223:9222/tcp" # Chrome debugging port (mapped to 9223 externally)
+      - "9223:9223/tcp" # Chrome debugging proxy port
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "5901"]

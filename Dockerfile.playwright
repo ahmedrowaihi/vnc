@@ -60,8 +60,8 @@ start_chromium() {
 
     # Start Chromium with debugging enabled and listening on all interfaces
     \$CHROMIUM_PATH \
-        --remote-debugging-port=9222 \
         --remote-debugging-address=0.0.0.0 \
+        --remote-debugging-port=9222 \
         --remote-allow-origins=* \
         --remote-allow-ips=* \
         --host-resolver-rules="MAP * 0.0.0.0" \
@@ -85,8 +85,8 @@ start_chromium() {
         kill \$CHROMIUM_PID 2>/dev/null || true
         sleep 2
         \$CHROMIUM_PATH \
-            --remote-debugging-port=9222 \
             --remote-debugging-address=0.0.0.0 \
+            --remote-debugging-port=9222 \
             --remote-allow-origins=* \
             --remote-allow-ips=* \
             --host-resolver-rules="MAP * 0.0.0.0" \

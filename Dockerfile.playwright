@@ -73,8 +73,7 @@ start_chromium() {
         --no-sandbox \
         --disable-web-security \
         --allow-running-insecure-content \
-        --user-data-dir=/tmp/chrome-debug \
-        --remote-debugging-pipe &
+        --user-data-dir=/tmp/chrome-debug &
     CHROMIUM_PID=\$!
 
     echo "Chromium started with PID \$CHROMIUM_PID"
@@ -99,9 +98,7 @@ start_chromium() {
             --no-sandbox \
             --disable-web-security \
             --allow-running-insecure-content \
-            --user-data-dir=/tmp/chrome-debug \
-            --remote-debugging-pipe \
-            --remote-debugging-address=0.0.0.0 &
+            --user-data-dir=/tmp/chrome-debug &
         CHROMIUM_PID=\$!
         sleep 2
     fi

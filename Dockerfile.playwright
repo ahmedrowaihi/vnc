@@ -133,6 +133,9 @@ if [ -z "\$VNC_PASSWORD" ]; then
     exit 1
 fi
 
+# Add host mapping for Chrome debugging
+echo "195.35.1.180 localhost" >> /etc/hosts
+
 echo "\$VNC_PASSWORD" | vncpasswd -f > /root/.vnc/passwd
 chmod 600 /root/.vnc/passwd
 

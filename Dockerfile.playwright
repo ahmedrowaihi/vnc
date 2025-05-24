@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnome-themes-standard \
     net-tools \
     socat \
+    netcat-traditional \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -158,6 +159,10 @@ if [ -z "\$VNC_PASSWORD" ]; then
     echo "Error: VNC_PASSWORD environment variable is not set"
     exit 1
 fi
+
+# Clean up any existing X server locks
+rm -f /tmp/.X*-lock
+rm -f /tmp/.X11-unix/*
 
 # Add host mapping for Chrome debugging
 echo "195.35.1.180 localhost" >> /etc/hosts

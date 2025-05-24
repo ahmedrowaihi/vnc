@@ -64,6 +64,7 @@ start_chromium() {
         --remote-debugging-address=0.0.0.0 \
         --remote-allow-origins=* \
         --remote-allow-ips=* \
+        --host-resolver-rules="MAP * 0.0.0.0" \
         --no-first-run \
         --no-default-browser-check \
         --disable-gpu \
@@ -71,13 +72,42 @@ start_chromium() {
         --disable-dev-shm-usage \
         --no-sandbox \
         --disable-web-security \
-        --allow-running-insecure-content &
+        --allow-running-insecure-content \
+        --user-data-dir=/tmp/chrome-debug \
+        --remote-debugging-pipe &
     CHROMIUM_PID=\$!
 
     echo "Chromium started with PID \$CHROMIUM_PID"
     
-    # No need to wait for dynamic port since we're using fixed port
-    echo "9222" > /tmp/chrome_debug_port
+    # Wait for Chrome to start and verify it's listening on all interfaces
+    sleep 2
+    if ! netstat -tulpn | grep chrome | grep -q "0.0.0.0:9222"; then
+        echo "Chrome not listening on all interfaces, restarting with different flags..."
+        kill \$CHROMIUM_PID 2>/dev/null || true
+        sleep 2
+        \$CHROMIUM_PATH \
+            --remote-debugging-port=9222 \
+            --remote-debugging-address=0.0.0.0 \
+            --remote-allow-origins=* \
+            --remote-allow-ips=* \
+            --host-resolver-rules="MAP * 0.0.0.0" \
+            --no-first-run \
+            --no-default-browser-check \
+            --disable-gpu \
+            --disable-software-rasterizer \
+            --disable-dev-shm-usage \
+            --no-sandbox \
+            --disable-web-security \
+            --allow-running-insecure-content \
+            --user-data-dir=/tmp/chrome-debug \
+            --remote-debugging-pipe \
+            --remote-debugging-address=0.0.0.0 &
+        CHROMIUM_PID=\$!
+        sleep 2
+    fi
+    
+    # Verify the port is listening on all interfaces
+    netstat -tulpn | grep chrome
 }
 
 # Function to handle cleanup

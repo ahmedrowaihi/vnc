@@ -12,7 +12,7 @@ services:
       - DISPLAY=:1
     ports:
       - "5901:5901/tcp" # VNC port
-      - "9222:9222/tcp" # Chrome debugging port
+      - "9223:9222/tcp" # Chrome debugging port (mapped to 9223 externally)
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "5901"]

@@ -60,7 +60,7 @@ start_chromium() {
 
     # Start Chromium with debugging enabled and listening on all interfaces
     \$CHROMIUM_PATH \
-        --remote-debugging-port=0 \
+        --remote-debugging-port=9222 \
         --remote-debugging-address=0.0.0.0 \
         --no-first-run \
         --no-default-browser-check \
@@ -74,13 +74,8 @@ start_chromium() {
 
     echo "Chromium started with PID \$CHROMIUM_PID"
     
-    # Wait for Chromium to start and get the debugging port
-    sleep 2
-    DEBUG_PORT=\$(netstat -tulpn | grep chrome | grep LISTEN | awk '{print \$4}' | cut -d: -f2)
-    echo "Chromium debugging port: \$DEBUG_PORT"
-    
-    # Update the port in the environment
-    echo "\$DEBUG_PORT" > /tmp/chrome_debug_port
+    # No need to wait for dynamic port since we're using fixed port
+    echo "9222" > /tmp/chrome_debug_port
 }
 
 # Function to handle cleanup

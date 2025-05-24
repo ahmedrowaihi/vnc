@@ -1,0 +1,152 @@
+# Use specific version for better reproducibility
+FROM mcr.microsoft.com/playwright
+
+# Set build arguments for non-sensitive configurable values
+ARG RESOLUTION=1920x1080
+ARG VNC_PORT=5901
+ARG DEBUG_PORT=9222
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    DISPLAY=:1 \
+    RESOLUTION=${RESOLUTION} \
+    VNC_PORT=${VNC_PORT} \
+    DEBUG_PORT=${DEBUG_PORT} \
+    USER=root
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tightvncserver \
+    dbus-x11 \
+    xfonts-base \
+    x11vnc \
+    openbox \
+    libpci3 \
+    adwaita-icon-theme \
+    gnome-themes-standard \
+    net-tools \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Create .vnc directory
+RUN mkdir -p /root/.vnc
+
+# Create xstartup script
+RUN <<EOF cat > /root/.vnc/xstartup
+#!/bin/sh
+set -x  # Enable debug output
+
+start_session() {
+    echo "Starting X session..."
+
+    # Basic X setup
+    xsetroot -solid grey
+    vncconfig -iconic &
+
+    echo "Starting window manager..."
+    openbox-session &
+
+    echo "Waiting for X to be ready..."
+    sleep 3
+
+    start_chromium
+}
+
+start_chromium() {
+    echo "Starting Chromium..."
+    # Try to find Chromium
+    CHROMIUM_PATH=\$(find /ms-playwright -name chrome -type f | head -n 1)
+    echo "Found Chromium at: \$CHROMIUM_PATH"
+
+    # Start Chromium with debugging enabled and listening on all interfaces
+    \$CHROMIUM_PATH \
+        --remote-debugging-port=0 \
+        --remote-debugging-address=0.0.0.0 \
+        --no-first-run \
+        --no-default-browser-check \
+        --disable-gpu \
+        --disable-software-rasterizer \
+        --disable-dev-shm-usage \
+        --no-sandbox \
+        --disable-web-security \
+        --allow-running-insecure-content &
+    CHROMIUM_PID=\$!
+
+    echo "Chromium started with PID \$CHROMIUM_PID"
+    
+    # Wait for Chromium to start and get the debugging port
+    sleep 2
+    DEBUG_PORT=\$(netstat -tulpn | grep chrome | grep LISTEN | awk '{print \$4}' | cut -d: -f2)
+    echo "Chromium debugging port: \$DEBUG_PORT"
+    
+    # Update the port in the environment
+    echo "\$DEBUG_PORT" > /tmp/chrome_debug_port
+}
+
+# Function to handle cleanup
+cleanup() {
+    echo "Cleaning up..."
+    kill \$CHROMIUM_PID 2>/dev/null || true
+    killall openbox 2>/dev/null || true
+    vncserver -kill :1 || true
+}
+
+# Set up signal handling
+trap cleanup SIGTERM SIGINT
+
+# Start initial session
+start_session
+
+# Monitor both VNC and Chromium
+while true; do
+    # Check VNC
+    if ! pgrep -f "Xtightvnc" > /dev/null; then
+        echo "VNC server stopped, restarting..."
+        cleanup
+        sleep 2
+        start_session
+        continue
+    fi
+
+    # Check Chromium
+    if ! kill -0 \$CHROMIUM_PID 2>/dev/null; then
+        echo "Chromium stopped, restarting..."
+        kill \$CHROMIUM_PID 2>/dev/null || true
+        sleep 2
+        start_chromium
+    fi
+
+    sleep 1
+done
+EOF
+
+RUN chmod +x /root/.vnc/xstartup
+
+# Create startup script
+RUN <<EOF cat > /start.sh
+#!/bin/bash
+set -e
+
+if [ -z "\$VNC_PASSWORD" ]; then
+    echo "Error: VNC_PASSWORD environment variable is not set"
+    exit 1
+fi
+
+echo "\$VNC_PASSWORD" | vncpasswd -f > /root/.vnc/passwd
+chmod 600 /root/.vnc/passwd
+
+echo "Starting VNC server at \$RESOLUTION..."
+vncserver -kill :1 || true
+vncserver -geometry \$RESOLUTION
+
+# Keep container running
+tail -f /dev/null
+EOF
+
+RUN chmod +x /start.sh
+
+# Expose VNC and debugging ports
+EXPOSE ${VNC_PORT} ${DEBUG_PORT}
+
+# Set entrypoint
+ENTRYPOINT ["/start.sh"]

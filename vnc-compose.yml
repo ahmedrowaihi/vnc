@@ -1,0 +1,21 @@
+services:
+  playwright-vnc:
+    build:
+      context: .
+      dockerfile: Dockerfile.playwright
+      args:
+        RESOLUTION: 1920x1080
+        VNC_PORT: 5901
+        DEBUG_PORT: 9222
+    environment:
+      - VNC_PASSWORD=playwright
+      - DISPLAY=:1
+    ports:
+      - "5901:5901" # VNC port
+      - "9222:9222" # Chrome debugging port
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "5901"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
